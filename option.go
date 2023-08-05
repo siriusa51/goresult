@@ -1,28 +1,51 @@
 package goresult
 
-// Option is an option type, it is either Some(T) or None.
-type Option[T any] struct {
-	Value T
+type Option[T any] interface {
+	Value() T
+	IsSome() bool
+	IsNone() bool
+	Unwrap() T
+	UnwrapOr(defaults T) T
+	UnwrapOrElse(f func() T) T
+	UnwrapOrDefault() T
+	Inspect(f func(T)) Option[T]
+	OkOr(err interface{}) Result[T]
+	OkOrElse(f func() error) Result[T]
+	Filter(predicate func(value T) bool) Option[T]
+}
+
+// option is an option type, it is either Some(T) or None.
+type option[T any] struct {
+	value T
 	none  bool
 }
 
 // Some returns an option value of Some(T).
-func Some[T any](value T) *Option[T] {
-	return &Option[T]{Value: value, none: false}
+func Some[T any](value T) Option[T] {
+	return &option[T]{value: value, none: false}
 }
 
 // None returns an option value of None.
-func None[T any]() *Option[T] {
-	return &Option[T]{none: true}
+func None[T any]() Option[T] {
+	return &option[T]{none: true}
+}
+
+// Value return value
+// example:
+//
+//	opt := Some(1)
+//	fmt.Println(opt.Value())
+func (opt *option[T]) Value() T {
+	return opt.value
 }
 
 // IsSome returns true if the option is a Some value.
-func (opt *Option[T]) IsSome() bool {
+func (opt *option[T]) IsSome() bool {
 	return !opt.none
 }
 
 // IsNone returns true if the option is a nil value.
-func (opt *Option[T]) IsNone() bool {
+func (opt *option[T]) IsNone() bool {
 	return opt.none
 }
 
@@ -36,12 +59,12 @@ func (opt *Option[T]) IsNone() bool {
 // opt := None[int]()
 // fmt.Println(opt.Unwrap())
 // // panic
-func (opt *Option[T]) Unwrap() T {
+func (opt *option[T]) Unwrap() T {
 	if opt.IsNone() {
-		panic("called `Option.Unwrap()` on a `nil` value")
+		panic("called `option.Unwrap()` on a `nil` value")
 	}
 
-	return opt.Value
+	return opt.value
 }
 
 // UnwrapOr returns the inner T of a Some(T). Returns defaults if the self value is nil.
@@ -54,12 +77,12 @@ func (opt *Option[T]) Unwrap() T {
 // opt := None[int]()
 // fmt.Println(opt.UnwrapOr(2))
 // // Output: 2
-func (opt *Option[T]) UnwrapOr(defaults T) T {
+func (opt *option[T]) UnwrapOr(defaults T) T {
 	if opt.IsNone() {
 		return defaults
 	}
 
-	return opt.Value
+	return opt.value
 }
 
 // UnwrapOrElse calls f if the self value is nil. Returns the inner T of a Some(T).
@@ -78,12 +101,12 @@ func (opt *Option[T]) UnwrapOr(defaults T) T {
 //	}))
 //
 // // Output: 2
-func (opt *Option[T]) UnwrapOrElse(f func() T) T {
+func (opt *option[T]) UnwrapOrElse(f func() T) T {
 	if opt.IsNone() {
 		return f()
 	}
 
-	return opt.Value
+	return opt.value
 }
 
 // UnwrapOrDefault returns the inner T of a Some(T). Returns the default value of T if the self value is nil.
@@ -96,30 +119,30 @@ func (opt *Option[T]) UnwrapOrElse(f func() T) T {
 // opt := None[int]()
 // fmt.Println(opt.UnwrapOrDefault())
 // // Output: 0
-func (opt *Option[T]) UnwrapOrDefault() T {
+func (opt *option[T]) UnwrapOrDefault() T {
 	if opt.IsNone() {
-		return None[T]().Value
+		return None[T]().Value()
 	}
 
-	return opt.Value
+	return opt.value
 }
 
 // Inspect calls f if the self value equals Some(T).
 // example:
 //
-//	Option.Some(1).Inspect(func(v int) {
+//	option.Some(1).Inspect(func(v int) {
 //		fmt.Println(v)
 //	})
 //	// Output: 1
 //
-//	Option.None[int]().Inspect(func(v int) {
+//	option.None[int]().Inspect(func(v int) {
 //		fmt.Println(v)
 //	})
 //
 // // Output:
-func (opt *Option[T]) Inspect(f func(T)) *Option[T] {
+func (opt *option[T]) Inspect(f func(T)) Option[T] {
 	if opt.IsSome() {
-		f(opt.Value)
+		f(opt.value)
 	}
 
 	return opt
@@ -136,9 +159,9 @@ func (opt *Option[T]) Inspect(f func(T)) *Option[T] {
 // opt := None[int]()
 // fmt.Println(opt.OkOr(errors.New("error")))
 // // Output: Error(error)
-func (opt *Option[T]) OkOr(err interface{}) *Result[T] {
+func (opt *option[T]) OkOr(err interface{}) Result[T] {
 	if opt.IsSome() {
-		return Ok[T](opt.Value)
+		return Ok[T](opt.value)
 	}
 
 	return Error[T](err)
@@ -161,9 +184,9 @@ func (opt *Option[T]) OkOr(err interface{}) *Result[T] {
 //	}))
 //
 // // Output: Error(error)
-func (opt *Option[T]) OkOrElse(f func() error) *Result[T] {
+func (opt *option[T]) OkOrElse(f func() error) Result[T] {
 	if opt.IsSome() {
-		return Ok[T](opt.Value)
+		return Ok[T](opt.value)
 	}
 
 	return Error[T](f())
@@ -172,8 +195,8 @@ func (opt *Option[T]) OkOrElse(f func() error) *Result[T] {
 // Filter returns None if the self value equals None, otherwise calls predicate with the wrapped value and returns:
 //   - Some(T) if predicate returns true (where T is the wrapped value)
 //   - None() otherwise.
-func (opt *Option[T]) Filter(predicate func(value T) bool) *Option[T] {
-	if opt.IsSome() && predicate(opt.Value) {
+func (opt *option[T]) Filter(predicate func(value T) bool) Option[T] {
+	if opt.IsSome() && predicate(opt.value) {
 		return opt
 	}
 

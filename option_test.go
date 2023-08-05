@@ -11,7 +11,7 @@ func Test_Option_Some(t *testing.T) {
 
 	assert.Equal(t, opt.IsSome(), true)
 	assert.Equal(t, opt.IsNone(), false)
-	assert.Equal(t, opt.Value, 1)
+	assert.Equal(t, opt.Value(), 1)
 }
 
 func Test_Option_None(t *testing.T) {
@@ -19,7 +19,7 @@ func Test_Option_None(t *testing.T) {
 
 	assert.Equal(t, opt.IsSome(), false)
 	assert.Equal(t, opt.IsNone(), true)
-	assert.Equal(t, opt.Value, 0)
+	assert.Equal(t, opt.Value(), 0)
 }
 
 func Test_Option_Unwrap(t *testing.T) {
@@ -31,7 +31,7 @@ func Test_Option_Unwrap(t *testing.T) {
 func Test_Option_Unwrap_None(t *testing.T) {
 	opt := None[int]()
 
-	assert.Panics(t, func() { opt.Unwrap() }, "called `Option.Unwrap()` on a `nil` value")
+	assert.Panics(t, func() { opt.Unwrap() }, "called `option.Unwrap()` on a `nil` value")
 }
 
 func Test_Option_UnwrapOr(t *testing.T) {

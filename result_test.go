@@ -47,11 +47,11 @@ func isNil[T any](t *testing.T, active T) {
 	assert.Nil(t, active, "Expected value to be nil, but got %v", active)
 }
 
-func assertOk[T any](t *testing.T, result *Result[T], excepted T) {
+func assertOk[T any](t *testing.T, result Result[T], excepted T) {
 	typeName := reflect.TypeOf(excepted).String()
 	t.Run(fmt.Sprintf("Ok(%s)", typeName), func(t *testing.T) {
-		equal(t, result.Value, excepted)
-		isNil(t, result.Error)
+		equal(t, result.Value(), excepted)
+		isNil(t, result.Error())
 	})
 }
 
@@ -73,10 +73,10 @@ func Test_Result_Ok(t *testing.T) {
 	assertOk(t, Ok(&v2), &v2)
 }
 
-func assertError[T any](t *testing.T, result *Result[T], excepted error) {
-	typeName := reflect.TypeOf(result.Value).String()
-	t.Run(fmt.Sprintf("Error(%s)", typeName), func(t *testing.T) {
-		equal(t, result.Error, excepted)
+func assertError[T any](t *testing.T, result Result[T], excepted error) {
+	typeName := reflect.TypeOf(result.Value()).String()
+	t.Run(fmt.Sprintf("error(%s)", typeName), func(t *testing.T) {
+		equal(t, result.Error(), excepted)
 	})
 }
 
@@ -89,12 +89,12 @@ func Test_Result_Error(t *testing.T) {
 	assertError(t, Error[map[string]interface{}]("error map[string]interface{}"), fmt.Errorf("error map[string]interface{}"))
 }
 
-func assertIsOk[T any](t *testing.T, result *Result[T], isOk bool) {
+func assertIsOk[T any](t *testing.T, result Result[T], isOk bool) {
 	typeName := reflect.TypeOf(isOk).String()
 	t.Run(fmt.Sprintf("IsOk(%s)", typeName), func(t *testing.T) {
 		equal(t, result.IsOk(), isOk)
 		if isOk {
-			isNil(t, result.Error)
+			isNil(t, result.Error())
 		}
 	})
 }
@@ -107,12 +107,12 @@ func Test_Result_IsOk(t *testing.T) {
 	assertIsOk(t, Error[float64](fmt.Errorf("error")), false)
 }
 
-func assertIsError[T any](t *testing.T, result *Result[T], isError bool) {
+func assertIsError[T any](t *testing.T, result Result[T], isError bool) {
 	typeName := reflect.TypeOf(isError).String()
 	t.Run(fmt.Sprintf("IsError(%s)", typeName), func(t *testing.T) {
 		equal(t, result.IsError(), isError)
 		if !isError {
-			isNil(t, result.Error)
+			isNil(t, result.Error())
 		}
 	})
 }
@@ -125,7 +125,7 @@ func Test_Result_IsError(t *testing.T) {
 	assertIsError(t, Error[float64](fmt.Errorf("error")), true)
 }
 
-func assertExcept[T any](t *testing.T, result *Result[T], excepted T, isPanic bool) {
+func assertExcept[T any](t *testing.T, result Result[T], excepted T, isPanic bool) {
 	typeName := reflect.TypeOf(excepted).String()
 	t.Run(fmt.Sprintf("Except(%s)", typeName), func(t *testing.T) {
 		if isPanic {
@@ -149,8 +149,8 @@ func Test_Result_Except(t *testing.T) {
 	assertExcept(t, Error[[]byte]("error"), nil, true)
 }
 
-func assertExceptError[T any](t *testing.T, result *Result[T], isPanic bool) {
-	typeName := reflect.TypeOf(result.Value).String()
+func assertExceptError[T any](t *testing.T, result Result[T], isPanic bool) {
+	typeName := reflect.TypeOf(result.Value()).String()
 	t.Run(fmt.Sprintf("ExceptError(%s)", typeName), func(t *testing.T) {
 		if isPanic {
 			assert.Panics(t, func() {
@@ -174,8 +174,8 @@ func Test_Result_ExceptError(t *testing.T) {
 	assertExceptError(t, Error[[]byte]("error"), false)
 }
 
-func assertInspect[T any](t *testing.T, result *Result[T], ok bool) {
-	typeName := reflect.TypeOf(result.Value).String()
+func assertInspect[T any](t *testing.T, result Result[T], ok bool) {
+	typeName := reflect.TypeOf(result.Value()).String()
 	t.Run(fmt.Sprintf("Inspect(%s)", typeName), func(t *testing.T) {
 		count := 1
 		result.Inspect(func(_ T) {
@@ -197,8 +197,8 @@ func Test_Result_Inspect(t *testing.T) {
 	assertInspect(t, Error[int]("error"), false)
 }
 
-func assertInspectError[T any](t *testing.T, result *Result[T], err bool) {
-	typeName := reflect.TypeOf(result.Value).String()
+func assertInspectError[T any](t *testing.T, result Result[T], err bool) {
+	typeName := reflect.TypeOf(result.Value()).String()
 	t.Run(fmt.Sprintf("InspectError(%s)", typeName), func(t *testing.T) {
 		count := 1
 		result.InspectError(func(_ error) {

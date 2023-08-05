@@ -5,13 +5,30 @@ import (
 	"reflect"
 )
 
-// Result is a generic type that represents either success (Ok) or failure (Error).
-type Result[T any] struct {
-	Value T
-	Error error
+type Result[T any] interface {
+	Value() T
+	Error() error
+	IsOk() bool
+	IsError() bool
+	Except(msg string) T
+	ExceptError(msg string) error
+	Inspect(f func(T)) Result[T]
+	InspectError(f func(error)) Result[T]
+	Unwrap() T
+	UnwrapError() error
+	UnwrapOr(defaults T) T
+	UnwrapOrDefault() T
+	UnwrapOrElse(f func() T) T
+	Option() Option[T]
 }
 
-// Ok returns a Result that is Ok.
+// result is a generic type that represents either success (Ok) or failure (Error).
+type result[T any] struct {
+	value T
+	error error
+}
+
+// Ok returns a result that is Ok.
 // example:
 //
 //	Ok(1)
@@ -19,23 +36,41 @@ type Result[T any] struct {
 //	Ok([]byte("world"))
 //
 // Ok[int32](10)
-func Ok[T any](value T) *Result[T] {
-	return &Result[T]{
-		Value: value,
-		Error: nil,
+func Ok[T any](value T) Result[T] {
+	return &result[T]{
+		value: value,
+		error: nil,
 	}
 }
 
-// Error returns a Result that is Error.
+// Error returns a result that is Error.
 // example:
 //
-//	Error[int](errors.New("something went wrong"))
-//	Error[string]("something went wrong")
-//	Error[any](fmt.Errorf("something went wrong"))
-func Error[T any](err interface{}) *Result[T] {
-	return &Result[T]{
-		Error: covertError(err),
+//	error[int](errors.New("something went wrong"))
+//	error[string]("something went wrong")
+//	error[any](fmt.Errorf("something went wrong"))
+func Error[T any](err interface{}) Result[T] {
+	return &result[T]{
+		error: covertError(err),
 	}
+}
+
+// Value return value
+// example:
+//
+//	result := Ok(1)
+//	fmt.Println(result.value())
+func (r *result[T]) Value() T {
+	return r.value
+}
+
+// Error return error
+// example:
+//
+//	result := error[int](errors.New("something went wrong"))
+//	fmt.Println(result.Error())
+func (r *result[T]) Error() error {
+	return r.error
 }
 
 // IsOk returns true if the result is Ok.
@@ -45,19 +80,19 @@ func Error[T any](err interface{}) *Result[T] {
 //	fmt.Println(result.IsOk())
 //
 // // Output: true
-func (r *Result[T]) IsOk() bool {
-	return r.Error == nil
+func (r *result[T]) IsOk() bool {
+	return r.error == nil
 }
 
 // IsError returns true if the result is Error.
 // example:
 //
-//	result := Error[int](errors.New("something went wrong"))
+//	result := error[int](errors.New("something went wrong"))
 //	fmt.Println(result.IsError())
 //
 // // Output: true
-func (r *Result[T]) IsError() bool {
-	return r.Error != nil
+func (r *result[T]) IsError() bool {
+	return r.error != nil
 }
 
 // Except returns the value if the result is Ok, otherwise it panics with the given message.
@@ -68,22 +103,22 @@ func (r *Result[T]) IsError() bool {
 //
 // // Output: 1
 //
-//	result := Error[int](errors.New("something went wrong"))
+//	result := error[int](errors.New("something went wrong"))
 //	fmt.Println(result.Except("something went wrong"))
 //
 // // panic: something went wrong
-func (r *Result[T]) Except(msg string) T {
+func (r *result[T]) Except(msg string) T {
 	if r.IsError() {
-		unwrapErrorFailed(msg, r.Error)
+		unwrapErrorFailed(msg, r.error)
 	}
 
-	return r.Value
+	return r.value
 }
 
 // ExceptError returns the error if the result is Error, otherwise it panics with the given message.
 // example:
 //
-//	result := Error[int](errors.New("something went wrong"))
+//	result := error[int](errors.New("something went wrong"))
 //	fmt.Println(result.ExceptError("something went wrong"))
 //
 // // Output: something went wrong
@@ -92,12 +127,12 @@ func (r *Result[T]) Except(msg string) T {
 //	fmt.Println(result.ExceptError("something went wrong"))
 //
 // // panic: something went wrong
-func (r *Result[T]) ExceptError(msg string) error {
+func (r *result[T]) ExceptError(msg string) error {
 	if r.IsOk() {
-		unwrapValueFailed(msg, r.Value)
+		unwrapValueFailed(msg, r.value)
 	}
 
-	return r.Error
+	return r.error
 }
 
 // Inspect calls the given function with the value if the result is Ok.
@@ -110,15 +145,15 @@ func (r *Result[T]) ExceptError(msg string) error {
 //
 // // Output: 1
 //
-//	result := Error[int](errors.New("something went wrong"))
+//	result := error[int](errors.New("something went wrong"))
 //	result.Inspect(func(v int) {
 //		fmt.Println(v)
 //	})
 //
 // // Output:
-func (r *Result[T]) Inspect(f func(T)) *Result[T] {
+func (r *result[T]) Inspect(f func(T)) Result[T] {
 	if r.IsOk() {
-		f(r.Value)
+		f(r.value)
 	}
 
 	return r
@@ -127,7 +162,7 @@ func (r *Result[T]) Inspect(f func(T)) *Result[T] {
 // InspectError calls the given function with the error if the result is Error.
 // example:
 //
-//	result := Error[int](errors.New("something went wrong"))
+//	result := error[int](errors.New("something went wrong"))
 //	result.InspectError(func(err error) {
 //		fmt.Println(err)
 //	})
@@ -140,22 +175,22 @@ func (r *Result[T]) Inspect(f func(T)) *Result[T] {
 //	})
 //
 // // Output:
-func (r *Result[T]) InspectError(f func(error)) *Result[T] {
+func (r *result[T]) InspectError(f func(error)) Result[T] {
 	if r.IsError() {
-		f(r.Error)
+		f(r.error)
 	}
 
 	return r
 }
 
 // Unwrap returns the value if the result is Ok, otherwise it panics.
-func (r *Result[T]) Unwrap() T {
-	return r.Except("called `Result.Unwrap()` on an `Error` value")
+func (r *result[T]) Unwrap() T {
+	return r.Except("called `result.Unwrap()` on an `error` value")
 }
 
 // UnwrapError returns the error if the result is Error, otherwise it panics.
-func (r *Result[T]) UnwrapError() error {
-	return r.ExceptError("called `Result.UnwrapError()` on an `Value` value")
+func (r *result[T]) UnwrapError() error {
+	return r.ExceptError("called `result.UnwrapError()` on an `value` value")
 }
 
 // UnwrapOr returns the value if the result is Ok, otherwise it returns the given default.
@@ -166,13 +201,13 @@ func (r *Result[T]) UnwrapError() error {
 //
 // // Output: 1
 //
-//	result := Error[int](errors.New("something went wrong"))
+//	result := error[int](errors.New("something went wrong"))
 //	fmt.Println(result.UnwrapOr(2))
 //
 // // Output: 2
-func (r *Result[T]) UnwrapOr(defaults T) T {
+func (r *result[T]) UnwrapOr(defaults T) T {
 	if r.IsOk() {
-		return r.Value
+		return r.value
 	}
 
 	return defaults
@@ -186,16 +221,16 @@ func (r *Result[T]) UnwrapOr(defaults T) T {
 //
 // // Output: 1
 //
-//	result := Error[int](errors.New("something went wrong"))
+//	result := error[int](errors.New("something went wrong"))
 //	fmt.Println(result.UnwrapOrDefault())
 //
 // // Output: 0
-func (r *Result[T]) UnwrapOrDefault() T {
+func (r *result[T]) UnwrapOrDefault() T {
 	if r.IsOk() {
-		return r.Value
+		return r.value
 	}
 
-	return Result[T]{}.Value
+	return result[T]{}.value
 }
 
 // UnwrapOrElse returns the value if the result is Ok, otherwise it calls and returns the given function.
@@ -208,26 +243,26 @@ func (r *Result[T]) UnwrapOrDefault() T {
 //
 // // Output: 1
 //
-//	result := Error[int](errors.New("something went wrong"))
+//	result := error[int](errors.New("something went wrong"))
 //	fmt.Println(result.UnwrapOrElse(func() int {
 //		return 2
 //	}))
 //
 // // Output: 2
-func (r *Result[T]) UnwrapOrElse(f func() T) T {
+func (r *result[T]) UnwrapOrElse(f func() T) T {
 	if r.IsOk() {
-		return r.Value
+		return r.value
 	}
 
 	return f()
 }
 
-// Option returns the value as an Option.
-// - If the result is Ok, the returned Option will be Some(T) with the value.
-// - If the result is Error, the returned Option will be None().
-func (r *Result[T]) Option() *Option[T] {
+// option returns the value as an option.
+// - If the result is Ok, the returned option will be Some(T) with the value.
+// - If the result is Error, the returned option will be None().
+func (r *result[T]) Option() Option[T] {
 	if r.IsOk() {
-		return Some(r.Value)
+		return Some(r.value)
 	}
 
 	return None[T]()
