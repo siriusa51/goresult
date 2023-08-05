@@ -60,6 +60,8 @@ func Error[T any](err interface{}) Result[T] {
 //
 //	result := Ok(1)
 //	fmt.Println(result.value())
+//
+// // Output: 1
 func (r *result[T]) Value() T {
 	return r.value
 }
@@ -69,6 +71,8 @@ func (r *result[T]) Value() T {
 //
 //	result := error[int](errors.New("something went wrong"))
 //	fmt.Println(result.Error())
+//
+// // Output: something went wrong
 func (r *result[T]) Error() error {
 	return r.error
 }
