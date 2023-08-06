@@ -7,6 +7,7 @@ import (
 
 type Result[T any] interface {
 	Value() T
+	ToAny() any
 	Error() error
 	IsOk() bool
 	IsError() bool
@@ -63,6 +64,17 @@ func Error[T any](err interface{}) Result[T] {
 //
 // // Output: 1
 func (r *result[T]) Value() T {
+	return r.value
+}
+
+// ToAny returns the value to any type.
+// example:
+//
+//	result := Ok(1)
+//	fmt.Println(result.ToAny())
+//
+// // Output: 1
+func (r *result[T]) ToAny() any {
 	return r.value
 }
 
